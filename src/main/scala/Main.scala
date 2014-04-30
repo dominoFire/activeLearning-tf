@@ -61,7 +61,7 @@ object Main {
     pw.close()
 
     //print some results
-    println("GlobalDict: " +(if(globalDictText!=null && globalDictText.length() >= 8) globalDictText.substring(0, 9) else "") )
+    println("GlobalDict: " +(if(globalDictText!=null && globalDictText.length() >= 20) globalDictText.substring(0, 20) else "") )
     println("Term Freq. Vectors: ")
     countWords.take(10).map( a => tuple_toString(a) ).map(println(_))
     println("Continuing happily")
