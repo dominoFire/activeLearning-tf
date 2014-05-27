@@ -2,6 +2,8 @@ name := "activeLearning-tf"
 
 version := "1.0"
 
+organization := "mx.itam.deiis.activelearning"
+
 scalaVersion := "2.10.3"
 
 libraryDependencies ++= Seq(

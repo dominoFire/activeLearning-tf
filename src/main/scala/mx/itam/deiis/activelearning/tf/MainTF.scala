@@ -1,11 +1,13 @@
+package mx.itam.deiis.activelearning.tf
+
 import org.apache.spark.rdd.RDD
-import org.apache.spark.SparkContext
-import org.apache.spark.SparkContext._
 import scalaz._
 import Scalaz._
-import java.io._
+import mx.itam.deiis.activelearning.Utils
 
-object Main {
+class MainTF {}
+
+object MainTF {
 
   //only works for V :< Integer
   def reduceByKey[K,V](collection: Traversable[Tuple2[K, V]])(implicit num: Numeric[V]) = {
@@ -32,12 +34,6 @@ object Main {
   def getGlobalDict(countWordsRDD: RDD[(Long, List[Map[String, Int]])], idx: Int): Map[String, Int] =
     countWordsRDD.map(e => e._2).map(x => if (x.length > idx) x(idx) else Map.empty[String, Int]).reduce( (a, b)  => a |+| b )
 
-  def writeFile(filename:String, content:String): Unit = {
-    val pw = new PrintWriter(new File(filename))
-    pw.write(content)
-    pw.close()
-  }
-
   def printSample(globalDict: Map[String, Int]): String = {
     if(globalDict!=null && globalDict.size >= 20)
       globalDict.take(20).mkString(",")
@@ -47,19 +43,17 @@ object Main {
   }
 
   def main(args:Array[String]) = {
-    var cores = Runtime.getRuntime().availableProcessors()
-    if(cores<1) {
-      System.err.println("Can't detect the number of cores")
-      System.exit(1)
-    }
+    val prop = Utils.getConfigProperties(args)
+    val sc = Utils.SparkContextFromConfig(prop, classOf[MainTF])
 
-    val sc = new SparkContext("local[" +cores +"]",
-      "activeLearning-tfidf",
-      "/home/perez/ITAM/DEIIS/spark/spark-0.9.1-bin-hadoop1",
-      List("target/scala-2.10/activelearning-tf_2.10-1.0.jar"))
+    //input
+    val preprocessDatasetFile = prop.getProperty("preprocessDatasetFile")
+    val tfGlobalDictFile = prop.getProperty("tfGlobalDictFile")
+    //output
+    val tfVectorsDatasetFile = prop.getProperty("tfVectorsDatasetFile")
 
     //init
-    val tf = sc.textFile("/home/perez/ITAM/DEIIS/ActiveLearning/datos/twitter-users_en.csv.preprocess")
+    val tf = sc.textFile(preprocessDatasetFile)
 
     //term freq vectors
     val countWords: RDD[(Long, List[Map[String, Int]])] = tf.map(line => map_action(line))
@@ -69,19 +63,24 @@ object Main {
     //global dictionaries
     //zero based index: name(2), time_zone(8), description(11), location(12)
     //in the list: name(0), time_zone(1), description(2), location(3)
-    val colnames = List("name", "timezone", "description", "location")
+    //val colnames = List("name", "timezone", "description", "location")
     val idxs = List(0,1,2,3)
     val globalDicts = idxs.map(i => getGlobalDict(countWords, i))
 
-    //save
-    println("#################################### Count: " +countWordsText.count())
-    countWordsText.saveAsTextFile("../datos/twitter-users_en.csv.tf_vectors")
-    idxs.foreach(i => writeFile("../datos/twitter-users_en.csv.globalDict_" +colnames(i) +".txt", globalDicts(i).keys.mkString("\n")))
+    val global = globalDicts.reduce( (a, b) => a |+| b)
 
+    //save
+    //println("#################################### Count: " +countWordsText.count())
+    countWordsText.saveAsTextFile(tfVectorsDatasetFile)
+    //idxs.foreach(i => writeFile("../datos/twitter-users_en.csv.globalDict_" +colnames(i) +".txt", globalDicts(i).keys.mkString("\n")))
+    Utils.writeFile(tfGlobalDictFile, global.keys.mkString("\n"))
     //print some results
-    idxs.foreach(i => println("GlobalDict_" +colnames(i) +": " +printSample(globalDicts(i))))
-    println("Term Freq. Vectors: ")
-    countWords.take(10).map( a => tuple_toString(a) ).map(println(_))
+    //idxs.foreach(i => println("GlobalDict_" +colnames(i) +": " +printSample(globalDicts(i))))
+    //println("Term Freq. Vectors: ")
+    //countWords.take(10).map( a => tuple_toString(a) ).map(println(_))
+
+    sc.stop()
+
     println("Continuing happily")
   }
 }
